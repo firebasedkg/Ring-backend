@@ -5,10 +5,29 @@ const cors = require('cors');
 const admin = require('firebase-admin');
 
 // Initialize Firebase Admin SDK
-const serviceAccount = require('../firebase-service-account.json');
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
+let serviceAccount;
+
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  try {
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  } catch (error) {
+    console.error('Error parsing FIREBASE_SERVICE_ACCOUNT env var:', error);
+  }
+} else {
+  try {
+    serviceAccount = require('../firebase-service-account.json');
+  } catch (error) {
+    console.warn('Could not load local firebase-service-account.json');
+  }
+}
+
+if (serviceAccount) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+} else {
+  console.error("Firebase Admin not initialized. Missing credentials.");
+}
 
 const app = express();
 
@@ -34,8 +53,13 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// Start server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Wellness backend listening on port ${PORT}`);
-});
+// Start server only if not in production (Vercel sets NODE_ENV to production)
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Wellness backend listening on port ${PORT}`);
+  });
+}
+
+// Export for Vercel serverless function
+module.exports = app;
